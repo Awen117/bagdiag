@@ -148,6 +148,8 @@ def cmd_lane(args):
         print(" 横移 %+.2fm  (%s)   变道: %s"
               % (r["lateral_delta_m"], r["lateral_axis"],
                  "是" if r["lane_change_likely"] else "否"))
+        if r.get("warning"):
+            print(" ⚠️  %s" % r["warning"])
         for w in r["intent_windows"][:6]:
             print("   意图 %s ~ %s (%.1fs)"
                   % (_fmt_ns(w["start_ns"]), _fmt_ns(w["end_ns"]), w["duration_s"]))

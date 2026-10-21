@@ -32,8 +32,17 @@ def analyze(reader, ref_t_ns=None, span_s=20.0):
         lateral, travel = dx, abs(dy)
         axis = "x (垂直 y 向行驶)"
 
+    # 路段是否大致沿某一主轴：主轴/次轴比值不够大时，横移量会被弯道污染
+    major, minor = max(abs(dx), abs(dy)), min(abs(dx), abs(dy))
+    axis_ratio = major / minor if minor > 1e-6 else 999.0
+    reliable = axis_ratio >= 2.5 or major < 5.0
+
     return {
         "t_ref_ns": t_ref,
+        "axis_ratio": round(axis_ratio, 2),
+        "lateral_reliable": reliable,
+        "warning": None if reliable else
+        "路段不沿主轴（主轴/次轴=%.1f），横移量可能被弯道污染，需人工确认" % axis_ratio,
         "span_s": round((b[0] - a[0]) / 1e9, 1),
         "travel_m": round(dist, 1),
         "travel_axis_m": round(travel, 1),
