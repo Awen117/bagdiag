@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bagdiag"
+version = "0.1.0"
+description = "Autoware MCAP 诊断工具：停障、轨迹、跟踪、变道、MRM 一键分析"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+authors = [{ name = "bagdiag contributors" }]
+keywords = ["autoware", "", "mcap", "ros2", "diagnostics", "adas"]
+dependencies = [
+  "mcap>=1.2.0",
+  "mcap-ros2-support>=0.4.0",
+  "zstandard>=0.21.0",
+]
+
+[project.scripts]
+bagdiag = "bagdiag.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["bagdiag*"]
