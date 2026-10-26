@@ -130,6 +130,99 @@ def cmd_track(args):
         print(" 跟踪轨迹 %d 条（≥%d 帧）" % (len(r["continuity"]), 20))
 
 
+def cmd_cat(args):
+    from . import io
+    from .modules import category
+    for p in _bags(args.path):
+        r = category.analyze(io.open_bag(p),
+                             window_s=args.window, radius_m=args.radius)
+        r["bag"] = os.path.basename(p)
+        if args.json:
+            print(json.dumps(r, ensure_ascii=False, indent=2))
+            continue
+        print("=" * 70)
+        print(" %s   类别一致性" % r["bag"])
+        print(" 检测 %d 帧｜配对 %d｜附近无跟踪目标 %d｜类别不一致 %d (%.0f%%)"
+              % (r["det_frames"], r["matched"], r["unmatched_in_radius"],
+                 r["mismatch"], r["mismatch_ratio"] * 100))
+        if r["pair_matrix"]:
+            print(" 配对矩阵:")
+            for row in r["pair_matrix"][:8]:
+                flag = "" if row["det"] == row["track"] else "   <-- 不一致"
+                print("   检测 %-22s -> 跟踪 %-22s %5d 帧%s"
+                      % (row["det"], row["track"], row["count"], flag))
+        if r["mismatch_samples"]:
+            print(" 不一致样本:")
+            for s in r["mismatch_samples"][:5]:
+                print("   %s  %s -> %s  距离 %sm  %s vs %s"
+                      % (_fmt_ns(s["t_ns"]), s["det"], s["track"],
+                         s["dist_m"], s["det_size"], s["trk_size"]))
+        if r.get("note"):
+            print(" 说明: %s" % r["note"])
+
+
+def cmd_turn(args):
+    from . import io
+    from .modules import turnsignal
+    for p in _bags(args.path):
+        r = turnsignal.analyze(io.open_bag(p))
+        r["bag"] = os.path.basename(p)
+        if args.json:
+            print(json.dumps(r, ensure_ascii=False, indent=2))
+            continue
+        print("=" * 70)
+        print(" %s   转向灯/模式一致性" % r["bag"])
+        print(" 灯亮帧数: 左 %d ｜ 右 %d" % (r["left_on_frames"], r["right_on_frames"]))
+        for key, title in (("autoware_state", "autoware/state"),
+                           ("operation_mode", "operation_mode"),
+                           ("control_mode", "control_mode")):
+            rows = r[key]
+            if rows:
+                print(" %-16s %s" % (title,
+                      ", ".join("%s->%s" % (_fmt_ns(x["t_ns"])[3:], x["name"])
+                                for x in rows[:5])))
+        if r["mismatch_count"]:
+            print(" 不一致 %d 处:" % r["mismatch_count"])
+            for x in r["mismatches"][:6]:
+                print("   %s  灯=%s 系统指令=%s"
+                      % (_fmt_ns(x["t_ns"]), x["status"], x["cmd"]))
+        else:
+            print(" 灯状态与系统指令一致")
+        if r.get("note"):
+            print(" 说明: %s" % r["note"])
+
+
+def cmd_gap(args):
+    from .modules import gap
+    r = gap.analyze(args.path, expect_s=args.expect, tolerance_s=args.tolerance)
+    if args.json:
+        print(json.dumps(r, ensure_ascii=False, indent=2))
+        return
+    if r.get("error"):
+        print(" %s" % r["error"]); return
+    print("=" * 70)
+
+    def _show(title, x):
+        print(" %s：%d 片（%s ~ %s）%s"
+              % (title, x["segments"], x["first_seg"], x["last_seg"],
+                 "OK" if x["ok"] else "有问题"))
+        for g in x["time_gaps"]:
+            print("   时间断层：%s 后 %s  断了 %.1f 秒"
+                  % (g["after_seg"], g["between"], g["gap_s"]))
+        for s0 in x["short_segments"]:
+            print("   短分片：片 %s 只有 %.1f 秒" % (s0["seg"], s0["duration_s"]))
+        for g in x["index_gaps"]:
+            print("   片号跳号：%s -> %s" % (g["from"], g["to"]))
+
+    if r.get("multi_session"):
+        for k, v in r["sessions"].items():
+            _show("会话 %s" % k, v)
+    else:
+        _show("会话 %s" % r.get("session", ""), r)
+    if r.get("note"):
+        print(" 说明: %s" % r["note"])
+
+
 def cmd_lane(args):
     from . import io
     from .modules import lanechange
@@ -224,6 +317,21 @@ def main(argv=None):
     p = sub.add_parser("avoid", help="绕行意图（路径横向偏移）")
     p.add_argument("path"); p.add_argument("--threshold", type=float, default=0.5)
     p.set_defaults(func=cmd_avoid)
+
+    p = sub.add_parser("cat", help="检测↔跟踪 类别一致性配对")
+    p.add_argument("path")
+    p.add_argument("--window", type=float, default=0.06, help="同帧窗口（秒）")
+    p.add_argument("--radius", type=float, default=2.0, help="配对半径（米）")
+    p.set_defaults(func=cmd_cat)
+
+    p = sub.add_parser("turn", help="转向灯 / 控制模式一致性")
+    p.add_argument("path"); p.set_defaults(func=cmd_turn)
+
+    p = sub.add_parser("gap", help="分片连续性（录制中断检测）")
+    p.add_argument("path", help="目录 或 会话 .info 文件")
+    p.add_argument("--expect", type=float, default=15.0, help="单片期望时长")
+    p.add_argument("--tolerance", type=float, default=2.0, help="允许误差（秒）")
+    p.set_defaults(func=cmd_gap)
 
     p = sub.add_parser("rosout", help="日志检索")
     p.add_argument("path", nargs="?")
