@@ -177,3 +177,20 @@ MIT
 ## 贡献
 
 话题名 / 阈值 / 口径都欢迎按你们车队实际情况提 PR。口径类的改动请在 PR 里写清楚"为什么原来的口径不对、实测反例是什么"，比改代码本身更重要。
+
+
+## scripts/ —— 实战分析脚本
+
+`bagdiag` 是把常用判定固化成包；`scripts/` 里是没进包的、按现场问题临时写的分析脚本，
+每个都能单独跑，用来回答具体问题。
+
+| 脚本 | 用法 | 回答什么 |
+|---|---|---|
+| `话题体检.py` | `python3 scripts/话题体检.py <bag.mcap>` | 各话题帧数、最长时间断档、频率是否正常 |
+| `目标统计.py` | `python3 scripts/目标统计.py <bag.mcap>` | 逐帧目标数、类别分布、跟踪 ID 连续性 |
+| `健康体检.py` | `python3 scripts/健康体检.py <health.json>` | 读 diag JSON，打印各模块得分与最低项 |
+| `批量体检.py` | `python3 scripts/批量体检.py <目录>` | 批量跑 diag health，按缺失/频率异常排序，落盘 JSON |
+| `bag.py` | import 用 | mcap 读取与话题抽取（消息解码、时间窗裁剪） |
+| `text_log.py` | import 用 | 文本日志按级别统计、按关键词聚类 |
+
+依赖同主包（`mcap` + `mcap-ros2-support`）。
