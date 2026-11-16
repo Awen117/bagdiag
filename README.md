@@ -1,8 +1,8 @@
 # bagdiag
 
-Autoware / ROS2 **MCAP 录包诊断工具**。离线跑，不依赖运行中的 ROS。
+**MCAP 录包离线诊断工具** —— 一条命令回答"这段包到底停没停住、刹得猛不猛、跟丢了没有、变没变道、有没有误触发 MRM"。
 
-面向回归测试与现场排查：把"这段包到底停没停住、刹得猛不猛、跟丢了没有、变没变道、有没有误触发 MRM"这类问题，用一条命令算出来。
+面向自动驾驶回归测试：不连车、不依赖运行中的 ROS、纯离线读包。
 
 ```
 $ bagdiag stop ./sample_11205.mcap
@@ -12,15 +12,35 @@ $ bagdiag stop ./sample_11205.mcap
 判定: PASS
 ```
 
+## 为什么需要它
+
+回归测试一天产出几十甚至上百个短分片，每个都要人看。难点其实不是"看不过来"，而是**两个人看同一个包会得出相反的结论** —— 因为口径没定下来：
+
+| 同一个问题 | 直觉做法 | 实际会错成什么样 |
+|---|---|---|
+| 变没变道 | 用初始航向投影算横移 | 弯道能放大出十几米的假值；改成分段航向积分，又把转向吸收掉算成接近 0（真值约一个车道宽） |
+| 有没有漏检 | 位置 + 尺寸双匹配 | 类别判错的目标被算成漏检，漏检率被虚高一个数量级 |
+| 刹得猛不猛 | 看控制指令峰值 | 指令会出现短时尖峰，但车速其实是十几秒平缓降完、平均不到 −0.5 m/s²，属正常停车 |
+| 轨迹是不是卡了 | 点数 ≥ 100 | 新版规划器输出**固定点数**，永远"不达标"，把正常规划误判成卡死 |
+| 有没有漏掉场景 | 看分片号连不连续 | 分片号连续（101→102），但时间戳可能断层半小时以上，那段测试根本没录到 |
+
+这个工具就是把这些口径**固化成代码**，让同一个包在任何人手里都得出同一个数。
+
+## 效果
+
+- 单包诊断 **< 1 秒**（十几秒的分片、约 5 万条消息）
+- **几百个分片**批量跑完约 **2 分钟**，输出可直接接 CI / 平台
+- 上面 5 条口径，每条都对应一个**实测反例**（下方「口径说明」逐条写明了错误做法、错误数值、正确数值）
+
 ## 安装
 
 ```bash
-git clone https://github.com/<your-name>/bagdiag.git
-cd bagdiag
+git clone https://github.com/<your-name>/bagdiag-toolkit.git
+cd bagdiag-toolkit
 pip install -e .
 ```
 
-依赖只有三个：`mcap`、`mcap-ros2-support`、`zstandard`。支持 `.mcap` 和整文件 zstd 压缩的 `.mcap.zst`（自动解到临时目录）。
+依赖只有 `mcap`、`mcap-ros2-support`、`zstandard`。支持 `.mcap` 和整文件 zstd 压缩的 `.mcap.zst`（自动解到临时目录）。
 
 ## 命令
 
@@ -40,7 +60,7 @@ pip install -e .
 
 `path` 可以是单个 `.mcap`，也可以是目录（批量跑）。
 
-加 `--json` 输出结构化结果，方便接到平台或 CI。
+加 `--json` 输出结构化结果：
 
 ```bash
 bagdiag --json stop ./segments/ > stop.json
@@ -53,10 +73,10 @@ bagdiag --json stop ./segments/ > stop.json
 ### 1. 坐标系
 
 ```
-/perception/object_recognition/detection/objects        base_link 帧
-/perception/object_recognition/detection/bevfusion/objects  base_link 帧
-/perception/object_recognition/tracking/objects         map 帧
-/perception/object_recognition/objects                  map 帧
+/perception/object_recognition/detection/objects             base_link 帧
+/perception/object_recognition/detection/bevfusion/objects   base_link 帧
+/perception/object_recognition/tracking/objects              map 帧
+/perception/object_recognition/objects                       map 帧
 ```
 
 做"检测有、跟踪无"对比时，**必须先用 ego 位姿把检测转到 map**，否则会得到大量假漏检。`track` 命令内部已处理。
@@ -131,8 +151,8 @@ bagdiag cat ./segments/
 最长可达半小时以上，中断时段的分片根本不存在，**对应时间点的测试场景完全无法分析**：
 
 ```bash
-bagdiag gap ./segments/            # 目录
-bagdiag gap ./session.info   # 会话 info
+bagdiag gap ./segments/                 # 目录
+bagdiag gap ./session.info               # 会话 info
 ```
 
 ## 典型用法
@@ -141,7 +161,7 @@ bagdiag gap ./session.info   # 会话 info
 # 1. 先看包完整不完整
 bagdiag info ./segments/
 
-# 2. 停障类场景（1.1 / 1.2 / 1.3 / 1.4 / 1.6）
+# 2. 停障类场景
 bagdiag stop ./segments/
 
 # 3. 轨迹是不是塌缩了 / guard 有没有 hold
@@ -160,25 +180,6 @@ bagdiag lane ./segments/
 bagdiag avoid ./segments/
 ```
 
-## 适用版本
-
-面向 Autoware（Humble）+ Autoware。话题名按 `autoware_universe` 的命名，老版本如果话题不同，改 `bagdiag/path.py`、`ego.py` 顶部的常量即可。
-
-## 不做的事
-
-- 不连车、不发指令、不改参数 —— 纯离线读包
-- 不替你下结论的边界：碰撞与否、体感好坏、场地是否允许，仍需现场判断
-- 不做可视化渲染，只出数字
-
-## License
-
-MIT
-
-## 贡献
-
-话题名 / 阈值 / 口径都欢迎按你们车队实际情况提 PR。口径类的改动请在 PR 里写清楚"为什么原来的口径不对、实测反例是什么"，比改代码本身更重要。
-
-
 ## scripts/ —— 实战分析脚本
 
 `bagdiag` 是把常用判定固化成包；`scripts/` 里是没进包的、按现场问题临时写的分析脚本，
@@ -194,3 +195,21 @@ MIT
 | `text_log.py` | import 用 | 文本日志按级别统计、按关键词聚类 |
 
 依赖同主包（`mcap` + `mcap-ros2-support`）。
+
+## 适用版本
+
+面向 Autoware（Humble）。话题名按 `autoware_universe` 的命名，老版本如果话题不同，改 `bagdiag/path.py`、`ego.py` 顶部的常量即可。
+
+## 不做的事
+
+- 不连车、不发指令、不改参数 —— 纯离线读包
+- 不替你下结论的边界：碰撞与否、体感好坏、场地是否允许，仍需现场判断
+- 不做可视化渲染，只出数字
+
+## License
+
+MIT
+
+## 贡献
+
+话题名 / 阈值 / 口径都欢迎按你们车队实际情况提 PR。口径类的改动请在 PR 里写清楚"为什么原来的口径不对、实测反例是什么"，比改代码本身更重要。
