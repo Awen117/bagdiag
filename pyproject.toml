@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
 authors = [{ name = "bagdiag contributors" }]
-keywords = ["autoware", "", "mcap", "ros2", "diagnostics", "adas"]
+keywords = ["autoware", "bagdiag", "mcap", "ros2", "diagnostics", "adas"]
 dependencies = [
   "mcap>=1.2.0",
   "mcap-ros2-support>=0.4.0",

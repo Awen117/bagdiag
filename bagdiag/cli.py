@@ -290,7 +290,7 @@ def cmd_rosout(args):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="bagdiag",
-        description=" / Autoware MCAP 诊断工具（不依赖运行中的 ROS）")
+        description="Autoware / ROS2 MCAP 诊断工具（不依赖运行中的 ROS）")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

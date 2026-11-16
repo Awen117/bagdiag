@@ -468,6 +468,8 @@ def _diagnostics(reader, t0):
 
 
 def _aeb(reader, t0):
+    # AEB 相关话题各车队命名不同：用环境变量 AEB_TOPICS（逗号分隔）覆盖；
+    # 不设置时用通用名，找不到就跳过，不影响其他命令。
     _cns = [c.strip() for c in os.environ.get("AEB_TOPICS", "").split(",") if c.strip()]
     for cn in (_cns or ["/control/aeb/ctrl", "/control/brake/ctrl"]):
         n = 0
