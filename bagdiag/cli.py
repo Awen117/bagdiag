@@ -103,6 +103,10 @@ def cmd_mrm(args):
             continue
         print("=" * 70)
         print(" %s   MRM 触发 %d 次" % (r["bag"], r["mrm_trigger_count"]))
+        if r.get("mrm_blip_count"):
+            print("   （另有 %d 次瞬时抖动 <0.5s，未计入）" % r["mrm_blip_count"])
+        for e in r.get("mrm_episodes", []):
+            print("   %s  持续 %.2fs" % (_fmt_ns(e["start_ns"]), e["duration_s"]))
         for t in r["mrm_transitions"]:
             print("   %s  %s -> %s" % (_fmt_ns(t["t_ns"]), t["from"], t["to"]))
 
@@ -238,9 +242,13 @@ def cmd_lane(args):
             print(" %s" % r["error"]); continue
         print(" 窗口 %.1fs  行进 %.1fm (主轴向 %.1fm)"
               % (r["span_s"], r["travel_m"], r["travel_axis_m"]))
+        if r.get("lateral_reliable"):
+            verdict = "是" if r["lane_change_likely"] else "否"
+        else:
+            verdict = "无法判定"
         print(" 横移 %+.2fm  (%s)   变道: %s"
-              % (r["lateral_delta_m"], r["lateral_axis"],
-                 "是" if r["lane_change_likely"] else "否"))
+              % (r["lateral_delta_m"], r["lateral_axis"], verdict))
+        print(" 航向变化 %.1f°" % r.get("yaw_change_deg", 0.0))
         if r.get("warning"):
             print(" ⚠️  %s" % r["warning"])
         for w in r["intent_windows"][:6]:
