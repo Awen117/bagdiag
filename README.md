@@ -35,12 +35,50 @@ $ bagdiag stop ./sample_11205.mcap
 ## 安装
 
 ```bash
-git clone https://github.com/<your-name>/bagdiag-toolkit.git
-cd bagdiag-toolkit
+git clone https://github.com/<your-name>/bagdiag.git
+cd bagdiag
 pip install -e .
 ```
 
 依赖只有 `mcap`、`mcap-ros2-support`、`zstandard`。支持 `.mcap` 和整文件 zstd 压缩的 `.mcap.zst`（自动解到临时目录）。
+
+## 快速开始
+
+**bagdiag 不录数据，只读你已有的 bag。** 手上没有 bag 的话，先把下面「需要什么数据」看完。
+
+```bash
+bagdiag info your_bag.mcap      # 1. 先确认包是完整的
+bagdiag stop your_bag.mcap      # 2. 停障场景
+bagdiag lane your_bag.mcap      # 3. 变道 / 取消变道
+bagdiag mrm  your_bag.mcap      # 4. 有没有误触发急停
+```
+
+一个完整的输出长什么样：见 [examples/样例输出.md](examples/样例输出.md)。
+
+### 需要什么数据
+
+任意 **Autoware / ROS2** 录制的 `.mcap`，至少包含这些话题：
+
+| 话题 | 用到的命令 | 没有会怎样 |
+|---|---|---|
+| `/localization/kinematic_state` | 全部 | 车位姿是基础，缺了所有命令都无法运行 |
+| `/perception/object_recognition/detection/objects` | `track` `cat` | 退化到只用跟踪层，无法对比检测/跟踪 |
+| `/perception/object_recognition/tracking/objects` | `track` `cat` | 无法判跟踪丢失 / 类别混淆 |
+| `/planning/scenario_planning/trajectory` | `traj` | 跳过轨迹类判定 |
+| `/system/fail_safe/mrm_state` | `mrm` | 跳过 MRM 判定 |
+| `/diagnostics` `/rosout` | `info` `rosout` | 跳过日志类分析 |
+
+**话题缺失不会报错**，工具会跳过对应判定并在输出里写明。如果你的车用了自定义 AEB 话题名，用环境变量覆盖：
+
+```bash
+export AEB_TOPICS=/your/aeb/ctrl,/your/brake/ctrl
+```
+
+### 数据从哪来
+
+自己车上的录制、公司/学校车队的数据、或公开的 Autoware 数据集（如 [Autoware 官方 sample](https://autowarefoundation.github.io/autoware-documentation/main/datasets/)）。
+
+> ⚠️ 工具本身不含任何数据。仓库里没有、也不应该有真实车辆数据。
 
 ## 命令
 
