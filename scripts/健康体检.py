@@ -7,7 +7,7 @@
 
 用法：
     # 1) 先把 diag 输出存成文件
-    cd ~/Desktop/workspace/tools
+    cd <解压目录>/scripts
     ./diag health "<某个 bag>.mcap" > /tmp/h.json
 
     # 2) 跑本脚本
