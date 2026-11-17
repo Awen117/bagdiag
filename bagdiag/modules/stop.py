@@ -4,6 +4,7 @@
 适用场景：本车道静止车、远距离静止车、低矮障碍、弯道内静止障碍、车道边缘障碍。
 """
 import math
+import os
 
 from .. import ego as ego_mod
 from ..io import iter_msgs
@@ -14,6 +15,12 @@ MRM = "/system/fail_safe/mrm_state"
 OBJECTS = "/perception/object_recognition/tracking/objects"
 
 MRM_NAMES = {1: "NORMAL", 2: "MRM_OPERATING", 3: "MRM_SUCCEEDED", 4: "MRM_FAILED"}
+
+# 判定阈值：默认取通用安全余量，按项目可用环境变量覆盖
+#   停稳后与目标的距离余量（米），越大越保守，默认 2.0
+MIN_STOP_GAP_M = float(os.environ.get("BAGDIAG_MIN_STOP_GAP_M", "2.0"))
+#   允许的峰值减速度（m/s²，取正值比较），舒适停车一般不超过 4
+MAX_DECEL_MPS2 = float(os.environ.get("BAGDIAG_MAX_DECEL_MPS2", "4.0"))
 
 
 def _obj_pos(k):
@@ -92,7 +99,7 @@ def analyze(reader, max_obj_dist=60.0):
     if near is not None:
         res["nearest_obj_m"] = round(near, 1)
 
-    # 判定（阈值可改）
+    # 判定（阈值见文件顶部，可用环境变量覆盖）
     ok = (res.get("stopped") and
           res.get("nearest_obj_m", 99) >= MIN_STOP_GAP_M and
           res.get("decel_peak_mps2", 0) >= -MAX_DECEL_MPS2 and
